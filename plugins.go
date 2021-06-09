@@ -103,13 +103,12 @@ func (m *Plugins) register(plugin Plugin) {
 	}
 }
 
-func (m *Plugins) AddProxy(proxy *Proxy) error {
+func (m *Plugins) AddProxy(ctx context.Context, proxy *Proxy) error {
 	uniq := proxy.String()
 	_, ok := m.Proxies[uniq]
 	if ok {
 		return nil
 	}
-	ctx := context.Background()
 	for _, plugin := range m.AddAndDelPlugins {
 		err := plugin.OnAdd(ctx, proxy)
 		if err != nil {
@@ -120,13 +119,12 @@ func (m *Plugins) AddProxy(proxy *Proxy) error {
 	return nil
 }
 
-func (m *Plugins) DelProxy(proxy *Proxy) error {
+func (m *Plugins) DelProxy(ctx context.Context, proxy *Proxy) error {
 	uniq := proxy.String()
 	proxy, ok := m.Proxies[uniq]
 	if !ok {
 		return nil
 	}
-	ctx := context.Background()
 	for _, plugin := range m.AddAndDelPlugins {
 		err := plugin.OnDel(ctx, proxy)
 		if err != nil {
