@@ -17,7 +17,7 @@ type Schedialer struct {
 	Resolver *net.Resolver
 }
 
-func (s *Schedialer) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+func (s *Schedialer) Match(ctx context.Context, network, address string) (*Proxy, error) {
 	resolver := s.Resolver
 	if resolver == nil {
 		resolver = net.DefaultResolver
@@ -46,7 +46,11 @@ func (s *Schedialer) DialContext(ctx context.Context, network, address string) (
 		IPs:     ips,
 		Port:    port,
 	}
-	proxy, err := s.Plugins.Match(ctx, &target)
+	return s.Plugins.Match(ctx, &target)
+}
+
+func (s *Schedialer) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	proxy, err := s.Match(ctx, network, address)
 	if err != nil {
 		return nil, err
 	}
