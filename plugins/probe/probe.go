@@ -35,8 +35,22 @@ type info struct {
 	lastUpdate time.Time
 }
 
-func NewProbe(uri string) schedialer.Plugin {
-	return &Probe{
+type Option func(r *Probe)
+
+func WithTimeout(timeout time.Duration) Option {
+	return func(r *Probe) {
+		r.timeout = timeout
+	}
+}
+
+func WithPeriod(period time.Duration) Option {
+	return func(r *Probe) {
+		r.period = period
+	}
+}
+
+func NewProbe(uri string, opts ...Option) schedialer.Plugin {
+	r := &Probe{
 		uri:     uri,
 		queue:   make(chan *info, 1),
 		checks:  map[string]*info{},
@@ -44,6 +58,10 @@ func NewProbe(uri string) schedialer.Plugin {
 		period:  time.Minute,
 		refresh: make(chan struct{}, 1),
 	}
+	for _, opt := range opts {
+		opt(r)
+	}
+	return r
 }
 
 func (p *Probe) Name() string {
