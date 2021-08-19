@@ -40,8 +40,8 @@ func NewProbe(uri string) schedialer.Plugin {
 		uri:     uri,
 		queue:   make(chan *info, 1),
 		checks:  map[string]*info{},
-		timeout: 30 * time.Second,
-		period:  time.Minute,
+		timeout: 5 * time.Second,
+		period:  30 * time.Second,
 		refresh: make(chan struct{}, 1),
 	}
 }
@@ -68,35 +68,28 @@ func (p *Probe) start() {
 	}()
 
 	go func() {
-		next := time.Now().Add(time.Minute)
+		last := time.Now()
+		period := p.period
 		for {
+			next := last.Add(period)
 			d := next.Sub(time.Now())
 			if d > 0 {
 				select {
 				case <-time.After(d):
 				case <-p.refresh:
-					if time.Now().Before(next) {
-						continue
-					}
+					period = p.period
+					continue
 				}
 			}
-			size := p.toStart()
-			period := time.Duration(size)*p.timeout + p.period
-
-			p.mutLastUse.Lock()
-			per := time.Since(p.lastUse)
-			p.mutLastUse.Unlock()
-
-			if per > period {
-				period = per
-			}
-			next = time.Now().Add(period)
+			p.toStart()
+			last = time.Now()
+			period <<= 1
 		}
 	}()
 	return
 }
 
-func (p *Probe) toStart() int {
+func (p *Probe) toStart() {
 	p.mutChecks.RLock()
 	defer p.mutChecks.RUnlock()
 	for _, info := range p.checks {
@@ -107,7 +100,7 @@ func (p *Probe) toStart() int {
 			p.queue <- info
 		}
 	}
-	return len(p.checks)
+	return
 }
 
 func (p *Probe) task(ctx context.Context, info *info) {
