@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sort"
 )
 
 const MaxScore = 100
@@ -134,8 +135,20 @@ func (m *Plugins) DelProxy(ctx context.Context, proxy *Proxy) error {
 	return nil
 }
 
-func (m *Plugins) Match(ctx context.Context, target *Target) (*Proxy, error) {
-	filters := make([]*Proxy, 0, len(m.Proxies))
+func (m *Plugins) Ranking(ctx context.Context, target *Target) ([]*Proxy, error) {
+	proxies, scores, err := m.match(ctx, target)
+	if err != nil {
+		return nil, err
+	}
+	sort.Sort(&proxyScoreSorter{
+		proxies: proxies,
+		scores:  scores,
+	})
+	return proxies, nil
+}
+
+func (m *Plugins) match(ctx context.Context, target *Target) ([]*Proxy, []int, error) {
+	proxies := make([]*Proxy, 0, len(m.Proxies))
 	scores := make([]int, 0, len(m.Proxies))
 loop:
 	for _, proxy := range m.Proxies {
@@ -144,36 +157,32 @@ loop:
 				continue loop
 			}
 		}
-		filters = append(filters, proxy)
+		proxies = append(proxies, proxy)
 
 		score := 0
 		for _, plugin := range m.ScorePlugins {
 			s, err := plugin.Score(ctx, target, proxy)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			score += s
 		}
 		scores = append(scores, score)
 	}
-	proxies := filters
+
 	if len(proxies) == 0 {
-		return nil, fmt.Errorf("not match")
+		return nil, nil, fmt.Errorf("not match")
 	}
 
 	for _, plugin := range m.ComparisonScorePlugins {
 		s, err := plugin.ComparisonScore(ctx, target, proxies)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		scoresAdd(&scores, s)
 	}
 
-	index := getIndexByMax(scores)
-	if index == -1 {
-		index = 0
-	}
-	return proxies[index], nil
+	return proxies, scores, nil
 }
 
 func (m *Plugins) Feedback(ctx context.Context, target *Target, proxy *Proxy, feedback *Feedback) {
@@ -188,14 +197,20 @@ func scoresAdd(p *[]int, e []int) {
 	}
 }
 
-func getIndexByMax(p []int) int {
-	m := 0
-	index := -1
-	for i, s := range p {
-		if s > m {
-			m = s
-			index = i
-		}
-	}
-	return index
+type proxyScoreSorter struct {
+	proxies []*Proxy
+	scores  []int
+}
+
+func (p *proxyScoreSorter) Len() int {
+	return len(p.scores)
+}
+
+func (p *proxyScoreSorter) Less(i, j int) bool {
+	return p.scores[i] > p.scores[j]
+}
+
+func (p *proxyScoreSorter) Swap(i, j int) {
+	p.scores[i], p.scores[j] = p.scores[j], p.scores[i]
+	p.proxies[i], p.proxies[j] = p.proxies[j], p.proxies[i]
 }
