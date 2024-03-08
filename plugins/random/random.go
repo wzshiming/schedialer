@@ -17,7 +17,7 @@ func NewRandom() schedialer.Plugin {
 	src := rand.NewSource(time.Now().UnixNano())
 	return &Random{
 		src:   src,
-		score: schedialer.MaxScore / 2,
+		score: schedialer.MaxScore / 10,
 	}
 }
 
