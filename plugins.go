@@ -18,6 +18,11 @@ type Proxy struct {
 	IP     net.IP
 	Port   int
 	Dialer Dialer
+
+	Aver    func() uint64
+	MaxAver func() uint64
+
+	Total func() uint64
 }
 
 func (p *Proxy) String() string {
