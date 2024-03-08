@@ -10,9 +10,9 @@ type Flow struct {
 	score int
 }
 
-func NewFlow() schedialer.Plugin {
+func NewFlow(score int) schedialer.Plugin {
 	return &Flow{
-		score: schedialer.MaxScore / 50,
+		score: score,
 	}
 }
 

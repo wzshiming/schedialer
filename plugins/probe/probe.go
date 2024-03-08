@@ -14,6 +14,7 @@ type Probe struct {
 	period  time.Duration
 	queue   chan *info
 	refresh chan struct{}
+	score   int
 
 	mutChecks sync.RWMutex
 	checks    map[string]*info
@@ -35,7 +36,7 @@ type info struct {
 	lastUpdate time.Time
 }
 
-func NewProbe(uri string) schedialer.Plugin {
+func NewProbe(score int, uri string) schedialer.Plugin {
 	return &Probe{
 		uri:     uri,
 		queue:   make(chan *info, 1),
@@ -43,6 +44,7 @@ func NewProbe(uri string) schedialer.Plugin {
 		timeout: 5 * time.Second,
 		period:  30 * time.Second,
 		refresh: make(chan struct{}, 1),
+		score:   score,
 	}
 }
 
@@ -191,9 +193,9 @@ func (p *Probe) ComparisonScore(ctx context.Context, target *schedialer.Target, 
 	for _, duration := range durations {
 		score := 0
 		if duration == min {
-			score = schedialer.MaxScore
+			score = p.score
 		} else {
-			score = int(float64(schedialer.MaxScore) * float64(min) / float64(duration))
+			score = int(float64(p.score) * float64(min) / float64(duration))
 		}
 		scores = append(scores, score)
 	}

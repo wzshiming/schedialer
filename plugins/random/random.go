@@ -13,11 +13,11 @@ type Random struct {
 	score int
 }
 
-func NewRandom() schedialer.Plugin {
+func NewRandom(score int) schedialer.Plugin {
 	src := rand.NewSource(time.Now().UnixNano())
 	return &Random{
 		src:   src,
-		score: schedialer.MaxScore / 10,
+		score: score,
 	}
 }
 

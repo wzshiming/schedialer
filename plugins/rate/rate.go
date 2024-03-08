@@ -10,9 +10,9 @@ type Rate struct {
 	score int
 }
 
-func NewRate() schedialer.Plugin {
+func NewRate(score int) schedialer.Plugin {
 	return &Rate{
-		score: schedialer.MaxScore / 50,
+		score: score,
 	}
 }
 
