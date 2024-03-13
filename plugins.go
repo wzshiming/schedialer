@@ -61,6 +61,8 @@ type FilterPlugin interface {
 }
 
 type Feedback struct {
+	Successful bool
+	Error      error
 }
 
 type FeedbackPlugin interface {

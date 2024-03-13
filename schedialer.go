@@ -5,23 +5,24 @@ import (
 	"fmt"
 	"net"
 	"time"
+	"errors"
 )
 
 func NewSchedialer(plugins *Plugins) *Schedialer {
 	return &Schedialer{
-		Plugins:  plugins,
-		Resolver: net.DefaultResolver,
-		Period:   time.Second,
+		Plugins:     plugins,
+		Resolver:    net.DefaultResolver,
+		DialTimeout: 10 * time.Second,
 	}
 }
 
 type Schedialer struct {
-	Plugins  *Plugins
-	Resolver *net.Resolver
-	Period   time.Duration
+	Plugins     *Plugins
+	Resolver    *net.Resolver
+	DialTimeout time.Duration
 }
 
-func (s *Schedialer) Ranking(ctx context.Context, network, address string) ([]*Proxy, error) {
+func (s *Schedialer) getTarget(ctx context.Context, network, address string) (*Target, error) {
 	resolver := s.Resolver
 	if resolver == nil {
 		resolver = net.DefaultResolver
@@ -45,12 +46,19 @@ func (s *Schedialer) Ranking(ctx context.Context, network, address string) ([]*P
 	if err != nil {
 		return nil, err
 	}
-	target := Target{
+	return &Target{
 		Address: address,
 		IPs:     ips,
 		Port:    port,
+	}, nil
+}
+
+func (s *Schedialer) Ranking(ctx context.Context, network, address string) ([]*Proxy, error) {
+	target, err := s.getTarget(ctx, network, address)
+	if err != nil {
+		return nil, err
 	}
-	return s.Plugins.Ranking(ctx, &target)
+	return s.Plugins.Ranking(ctx, target)
 }
 
 func (s *Schedialer) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
@@ -62,23 +70,33 @@ func (s *Schedialer) DialContext(ctx context.Context, network, address string) (
 	switch len(proxies) {
 	case 0:
 		return nil, fmt.Errorf("no proxy available")
-	case 1:
-		return proxies[0].Dialer.DialContext(ctx, network, address)
 	}
-	return fallbackDial(proxies, ctx, network, address)
+	return s.fallbackDial(proxies, ctx, network, address)
 }
 
-func fallbackDial(proxies []*Proxy, ctx context.Context, network, address string) (net.Conn, error) {
-	var err error
-	for _, proxy := range proxies {
-		conn, e := proxy.Dialer.DialContext(ctx, network, address)
-		if e != nil {
-			if err == nil {
-				err = e
-			}
-			continue
-		}
-		return conn, nil
+func (s *Schedialer) fallbackDial(proxies []*Proxy, ctx context.Context, network, address string) (net.Conn, error) {
+	target, err := s.getTarget(ctx, network, address)
+	if err != nil {
+		return nil, err
 	}
-	return nil, err
+
+	var errs []error
+	for _, proxy := range proxies {
+		dialTimeout, cancel := context.WithTimeout(ctx, s.DialTimeout)
+		conn, err := proxy.Dialer.DialContext(dialTimeout, network, address)
+		cancel()
+		if err == nil {
+			s.Plugins.Feedback(ctx, target, proxy, &Feedback{
+				Successful: true,
+			})
+			return conn, nil
+		}
+
+		s.Plugins.Feedback(ctx, target, proxy, &Feedback{
+			Error: err,
+		})
+
+		errs = append(errs, err)
+	}
+	return nil, errors.Join(errs...)
 }
