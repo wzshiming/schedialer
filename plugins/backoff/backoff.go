@@ -1,9 +1,9 @@
 package backoff
 
 import (
-	"time"
-	"sync"
 	"context"
+	"sync"
+	"time"
 
 	"github.com/wzshiming/schedialer"
 )

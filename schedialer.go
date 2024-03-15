@@ -2,10 +2,10 @@ package schedialer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"time"
-	"errors"
 )
 
 func NewSchedialer(plugins *Plugins) *Schedialer {
