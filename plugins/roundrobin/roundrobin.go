@@ -18,6 +18,13 @@ func NewRoundRobin(score int) schedialer.Plugin {
 	}
 }
 
+func NewRoundRobinWithIndex(score int, index uint64) schedialer.Plugin {
+	return &RoundRobin{
+		score: score,
+		index: index,
+	}
+}
+
 func (r *RoundRobin) Name() string {
 	return "RoundRobin"
 }
